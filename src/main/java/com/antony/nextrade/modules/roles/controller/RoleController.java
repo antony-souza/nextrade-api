@@ -1,0 +1,66 @@
+package com.antony.nextrade.modules.roles.controller;
+
+import com.antony.nextrade.common.api.ApiResponse;
+import com.antony.nextrade.common.pagination.IPaginationResponse;
+import com.antony.nextrade.config.security.RequiresPermission;
+import com.antony.nextrade.modules.permissions.model.Permission;
+import com.antony.nextrade.modules.roles.repository.IRoleRepository;
+import com.antony.nextrade.modules.roles.usecase.create.CreateRoleRequest;
+import com.antony.nextrade.modules.roles.usecase.create.CreateRoleResponse;
+import com.antony.nextrade.modules.roles.usecase.create.CreateRoleUseCase;
+import com.antony.nextrade.modules.roles.usecase.findall.FindAllRolesProjection;
+import com.antony.nextrade.modules.roles.usecase.update.UpdateRoleRequest;
+import com.antony.nextrade.modules.roles.usecase.update.UpdateRoleResponse;
+import com.antony.nextrade.modules.roles.usecase.update.UpdateRoleUseCase;
+import com.antony.nextrade.services.pagination.PaginationService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
+
+@RestController()
+@RequestMapping("/v1/roles")
+@RequiredArgsConstructor
+public class RoleController {
+    private final IRoleRepository roleRepository;
+    private final PaginationService paginationService;
+    private final CreateRoleUseCase createRoleUseCase;
+    private final UpdateRoleUseCase updateRoleUseCase;
+
+    @RequiresPermission(Permission.ROLE_READ)
+    @GetMapping()
+    public ResponseEntity<ApiResponse<IPaginationResponse<FindAllRolesProjection>>> findAll(Pageable pageable) {
+        var response = paginationService.execute(
+                roleRepository,
+                pageable,
+                FindAllRolesProjection.class
+        );
+
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @RequiresPermission(Permission.ROLE_CREATE)
+    @PostMapping()
+    public ResponseEntity<ApiResponse<CreateRoleResponse>> create(
+            @Valid @RequestBody CreateRoleRequest request
+    ) {
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(ApiResponse.success(createRoleUseCase.execute(request)));
+    }
+
+    @RequiresPermission(Permission.ROLE_UPDATE)
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<UpdateRoleResponse>> update(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateRoleRequest request
+    ) {
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(ApiResponse.success(updateRoleUseCase.execute(id, request)));
+    }
+}

@@ -1,0 +1,34 @@
+spring:
+  application:
+    name: nextrade
+  config:
+    import:
+      - optional:file:./.env[.properties]
+      - optional:file:./nextrade-api/.env[.properties]
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:nextrade}?sslmode=${POSTGRES_SSLMODE:disable}
+    username: ${POSTGRES_USER:nextrade}
+    password: ${POSTGRES_PASSWORD}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+
+server:
+  port: ${SERVER_PORT:8082}
+  servlet:
+    context-path: /api
+
+jwt:
+  key: ${JWT_KEY}
+  expiration: ${JWT_EXPIRATION:9000000}
+
+nextrade:
+  cors:
+    allowed-origins: "${CORS_ALLOWED_ORIGINS:http://localhost:*,http://127.0.0.1:*}"
+  seed:
+    admin:
+      enabled: ${ADMIN_SEED_ENABLED:false}
+      email: ${ADMIN_SEED_EMAIL:}
+      username: ${ADMIN_SEED_USERNAME:admin}
+      password: ${ADMIN_SEED_PASSWORD:}

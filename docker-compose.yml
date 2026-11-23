@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-nextrade}
+      POSTGRES_USER: ${POSTGRES_USER:-nextrade}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no .env}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - nextrade-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nextrade} -d ${POSTGRES_DB:-nextrade}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  nextrade-db:
