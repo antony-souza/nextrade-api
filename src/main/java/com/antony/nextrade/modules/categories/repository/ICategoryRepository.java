@@ -8,5 +8,6 @@ import com.antony.nextrade.common.repositories.IBaseRepository;
 import com.antony.nextrade.modules.categories.model.CategoryEntity;
 
 @Repository
-public interface CategoryRepository extends IBaseRepository<CategoryEntity, UUID> {
+public interface ICategoryRepository extends IBaseRepository<CategoryEntity, UUID> {
+    boolean existsByCodeAndDeletedAtIsNull(String code);
 }
