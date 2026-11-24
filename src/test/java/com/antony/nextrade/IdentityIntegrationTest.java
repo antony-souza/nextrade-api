@@ -1,19 +1,32 @@
 package com.antony.nextrade;
 
 import com.antony.nextrade.config.scripts.DefaultUserSeed;
+import com.antony.nextrade.config.upload.IFileUploadService;
 import com.antony.nextrade.modules.permissions.model.Permission;
 import com.antony.nextrade.modules.users.repository.IUserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import tools.jackson.databind.ObjectMapper;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -22,6 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.datasource.url=${NEXTRADE_TEST_DB_URL:jdbc:h2:mem:nextrade;MODE=PostgreSQL;DB_CLOSE_DELAY=-1}",
         "spring.datasource.username=${NEXTRADE_TEST_DB_USERNAME:sa}",
         "spring.datasource.password=${NEXTRADE_TEST_DB_PASSWORD:}",
+        "cloudflare.r2.enabled=false",
         "jwt.key=HWzT05Y1nVyN1xOu0qyXAsKp++nX6vXSiKQjvlYMJYU=",
         "nextrade.seed.admin.enabled=true",
         "nextrade.seed.admin.email=admin@nextrade.test",
@@ -47,6 +61,9 @@ class IdentityIntegrationTest {
 
     @Autowired
     private DefaultUserSeed defaultUserSeed;
+
+    @MockitoSpyBean
+    private IFileUploadService uploadService;
 
     @Test
     void signsUpWithUserRoleAndStoresBothPasswordsAsBcrypt() throws Exception {
@@ -153,6 +170,71 @@ class IdentityIntegrationTest {
         var grantId = adminGrants.get(0).path("id").asText();
         mvc.perform(delete("/v1/role-permissions/{id}", grantId).header("Authorization", adminToken))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void updatesAndRemovesPhotosOnlyForTheAuthenticatedProfile() throws Exception {
+        var token = createPhotoUser("fotosperfil");
+        var userId = read(mvc.perform(get("/v1/profile").header("Authorization", token))
+                .andExpect(status().isOk()), "/data/id");
+        var avatarUrl = "https://photos.example.test/avatar.png";
+        var coverUrl = "https://photos.example.test/cover.png";
+        doReturn(avatarUrl).when(uploadService).upload(any(), eq("avatars/" + userId));
+        doReturn(coverUrl).when(uploadService).upload(any(), eq("covers/" + userId));
+
+        mvc.perform(multipart(HttpMethod.PUT, "/v1/profile").file(png("avatar")))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(multipart(HttpMethod.PUT, "/v1/profile").file(png("avatar")).file(png("cover"))
+                        .header("Authorization", token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.avatarUrl").value(avatarUrl))
+                .andExpect(jsonPath("$.data.coverUrl").value(coverUrl));
+
+        mvc.perform(get("/v1/profile").header("Authorization", token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.avatarUrl").value(avatarUrl))
+                .andExpect(jsonPath("$.data.coverUrl").value(coverUrl));
+
+        mvc.perform(multipart(HttpMethod.PUT, "/v1/profile").param("removeAvatar", "true")
+                        .header("Authorization", token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.avatarUrl").isEmpty())
+                .andExpect(jsonPath("$.data.coverUrl").value(coverUrl));
+    }
+
+    @Test
+    void validatesBothPhotosBeforeUploadingEitherOne() throws Exception {
+        var token = createPhotoUser("fotoinvalida");
+        var invalid = new MockMultipartFile("cover", "fake.png", "image/png", new byte[]{1, 2});
+        var oversized = new MockMultipartFile("cover", "large.png", "image/png", new byte[5 * 1024 * 1024 + 1]);
+
+        for (var photo : new MockMultipartFile[]{invalid, oversized}) {
+            mvc.perform(multipart(HttpMethod.PUT, "/v1/profile").file(png("avatar")).file(photo)
+                            .header("Authorization", token))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.success").value(false));
+        }
+        verifyNoInteractions(uploadService);
+    }
+
+    @Test
+    void returnsServiceUnavailableWithUploadDisabled() throws Exception {
+        var token = createPhotoUser("fotosemr2");
+
+        mvc.perform(multipart(HttpMethod.PUT, "/v1/profile").file(png("avatar")).header("Authorization", token))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    private String createPhotoUser(String username) throws Exception {
+        return bearer(read(signUp("Foto de Perfil", username + "@nextrade.test", username, USER_PASSWORD)
+                .andExpect(status().isCreated()), "/data/token"));
+    }
+
+    private MockMultipartFile png(String part) throws IOException {
+        var bytes = new ByteArrayOutputStream();
+        ImageIO.write(new BufferedImage(2, 2, BufferedImage.TYPE_INT_RGB), "png", bytes);
+        return new MockMultipartFile(part, "photo.png", "image/png", bytes.toByteArray());
     }
 
     private void assertPasswordIsHashed(String email, String password) {

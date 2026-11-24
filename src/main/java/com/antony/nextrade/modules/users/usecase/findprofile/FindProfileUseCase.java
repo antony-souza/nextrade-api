@@ -18,8 +18,6 @@ public class FindProfileUseCase {
     public ProfileResponse execute(UUID id) {
         var user = userRepository.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuário não encontrado"));
-        var role = user.getRole();
-        return new ProfileResponse(user.getId(), user.getName(), user.getEmail(), user.getUsername(),
-                role.getId(), role.getCode());
+        return ProfileResponse.from(user);
     }
 }

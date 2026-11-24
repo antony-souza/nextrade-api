@@ -10,6 +10,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestControllerAdvice
@@ -37,6 +38,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleResponseStatusException(ResponseStatusException exception) {
         return ResponseEntity.status(exception.getStatusCode())
                 .body(ApiResponse.failure(new ApiError(null, exception.getReason())));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMaxUploadSizeExceeded() {
+        return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE)
+                .body(ApiResponse.failure(new ApiError(null, "O upload excede o limite da requisição")));
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

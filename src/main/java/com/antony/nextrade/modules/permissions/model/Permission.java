@@ -2,6 +2,7 @@ package com.antony.nextrade.modules.permissions.model;
 
 public enum Permission {
     PROFILE_READ,
+    PROFILE_UPDATE,
     USER_READ,
     USER_UPDATE,
     ROLE_READ,

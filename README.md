@@ -16,7 +16,7 @@ A API fica em `http://localhost:8082/api`. As origens do frontend podem ser conf
 
 ## Autenticação e permissões
 
-O Flyway cria as tabelas, o catálogo de permissões e os vínculos iniciais. A role `admin` recebe todas as permissões base. A role `user` recebe `PROFILE_READ` e é atribuída automaticamente no cadastro público. A seed do administrador preserva contas existentes e falha se o email ou username já estiver em uso por outro cadastro.
+O Flyway cria as tabelas, o catálogo de permissões e os vínculos iniciais. A role `admin` recebe todas as permissões base. A role `user` recebe `PROFILE_READ` e `PROFILE_UPDATE` e é atribuída automaticamente no cadastro público. A seed do administrador preserva contas existentes e falha se o email ou username já estiver em uso por outro cadastro.
 
 O cadastro e o login retornam `data.token`. Envie esse JWT no cabeçalho `Authorization: Bearer <token>` nas rotas protegidas. As senhas novas devem ter pelo menos 8 caracteres e até 72 bytes em UTF-8, o limite do BCrypt.
 
@@ -25,6 +25,7 @@ O cadastro e o login retornam `data.token`. Envie esse JWT no cabeçalho `Author
 | `POST /api/v1/auth/sign-up` | Público. Recebe `name`, `email`, `username` e `password` |
 | `POST /api/v1/auth/sign-in` | Público. Recebe `email` e `password` |
 | `GET /api/v1/profile` | `PROFILE_READ` |
+| `PUT /api/v1/profile` | `PROFILE_UPDATE`. Recebe as fotos do próprio perfil em multipart |
 | `GET /api/v1/users` | `USER_READ` |
 | `PUT /api/v1/users/{id}/role` | `USER_UPDATE` e role `admin`. Recebe `roleId` |
 | `GET /api/v1/roles` | `ROLE_READ` |
@@ -39,6 +40,14 @@ O cadastro e o login retornam `data.token`. Envie esse JWT no cabeçalho `Author
 Use `@RequiresPermission(Permission.ROLE_READ)` nos métodos dos controllers. A API consulta a role atual do usuário e seus vínculos no banco a cada requisição protegida. Concessões, revogações e mudanças de role passam a valer nas próximas requisições, inclusive com tokens já emitidos. Uma role nova começa sem permissões. Para proteger uma rota com uma nova permissão, inclua o código no enum `Permission`, adicione uma migration e anote o método.
 
 A role `admin` é atribuída pela seed e seus vínculos são definidos pelas migrations. Quem recebe permissão para gerenciar vínculos em outras roles só pode conceder ou revogar permissões que também possui. O administrador pode gerenciar qualquer permissão nessas roles.
+
+## Fotos do perfil no Cloudflare R2
+
+No `.env`, defina `R2_ENABLED=true` e preencha `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME` e `R2_PUBLIC_URL`. Use uma credencial R2 com acesso de leitura e gravação limitado ao bucket. `R2_PUBLIC_URL` deve ser a URL pública de leitura do bucket. Consulte a [documentação de autenticação do Cloudflare R2](https://developers.cloudflare.com/r2/api/tokens/) e de [acesso público](https://developers.cloudflare.com/r2/buckets/public-buckets/).
+
+Envie `PUT /api/v1/profile` com Bearer JWT e `multipart/form-data`. Os campos `avatar` e `cover` aceitam JPG, PNG e GIF de até 5 MiB e 8.000 pixels por dimensão. Envie somente os campos que quer alterar. As URLs retornam em `data.avatarUrl` e `data.coverUrl` no PUT e no GET.
+
+Os objetos usam as chaves `nextrade/avatars/{userId}/{uuid}.{ext}` e `nextrade/covers/{userId}/{uuid}.{ext}`. Para desvincular uma imagem, envie `removeAvatar=true` ou `removeCover=true`, sem arquivo no campo correspondente. Assim como no OpenJobs, desvincular uma imagem limpa a URL do perfil e preserva o objeto no bucket. Com `R2_ENABLED=false`, o envio de fotos retorna `503`.
 
 ## Testes e CI
 

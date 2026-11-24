@@ -5,6 +5,10 @@ spring:
     import:
       - optional:file:./.env[.properties]
       - optional:file:./nextrade-api/.env[.properties]
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 12MB
   datasource:
     url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:nextrade}?sslmode=${POSTGRES_SSLMODE:disable}
     username: ${POSTGRES_USER:nextrade}
@@ -22,6 +26,15 @@ server:
 jwt:
   key: ${JWT_KEY}
   expiration: ${JWT_EXPIRATION:9000000}
+
+cloudflare:
+  r2:
+    enabled: ${R2_ENABLED:false}
+    account-id: ${R2_ACCOUNT_ID:}
+    access-key-id: ${R2_ACCESS_KEY_ID:}
+    secret-access-key: ${R2_SECRET_ACCESS_KEY:}
+    bucket-name: ${R2_BUCKET_NAME:}
+    public-url: ${R2_PUBLIC_URL:}
 
 nextrade:
   cors:
